@@ -32,13 +32,9 @@ class TweetProcessor {
         },
       },
       system: `Roleplay and generate interesting content on behalf of ${this.username}.`,
-      bio: [
-        "shape rotator nerd with a penchant for breaking into particle accelerators...",
-      ],
-      lore: ["once spent a month living entirely in VR..."],
-      knowledge: [
-        // Will be populated based on topics and expertise detected in tweets
-      ],
+      bio: [],
+      lore: [],
+      knowledge: [],
       messageExamples: [
         [
           {
@@ -159,28 +155,11 @@ class TweetProcessor {
       let characterData = await this.loadCharacterData();
 
       const filteredTweets = tweets
-        .filter((tweet) => {
-          if (!tweet.text) {
-            console.log(
-              `Filtered out tweet with no text: ${JSON.stringify(tweet)}`
-            );
-            return false;
-          }
-          return true;
-        })
-        .filter((tweet) => {
-          if (tweet.text.startsWith("RT @")) {
-            console.log(`Filtered out retweet: ${tweet.text}`);
-            return false;
-          }
-          return true;
-        })
-        .map((tweet) => {
-          return {
-            ...tweet,
-            text: tweet.text.replace(/@\S+/g, "").trim(),
-          };
-        });
+        .filter((tweet) => tweet.text && !tweet.text.startsWith("RT @"))
+        .map((tweet) => ({
+          ...tweet,
+          text: tweet.text.replace(/@\S+/g, "").trim(),
+        }));
 
       // Process tweets into postExamples - take all unique tweets
       const uniqueTweets = Array.from(
@@ -234,6 +213,7 @@ class TweetProcessor {
         `📝 Added ${characterData.postExamples.length} post examples`
       );
       console.log(`📝 Extracted ${characterData.topics.length} topics`);
+      return uniqueTweets;
     } catch (error) {
       console.error(`Failed to process tweets: ${error.message}`);
       throw error;
@@ -241,28 +221,31 @@ class TweetProcessor {
   }
 }
 
-// Usage
-const run = async () => {
+// Exported function to be used externally
+export async function generateCharacter(username, date) {
+  if (!username || !date) {
+    throw new Error("Username and date (YYYY-MM-DD) are required.");
+  }
+
+  console.log(`Generating character for ${username} from ${date}`);
+  const processor = new TweetProcessor(username, date);
+  const res = await processor.processTweets();
+  return res;
+}
+
+// CLI Execution
+if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const username = args[0];
   const date = args[1];
 
-  if (!username) {
-    console.error("Please provide a username");
+  if (!username || !date) {
+    console.error("Usage: node processTweets.js <username> <YYYY-MM-DD>");
     process.exit(1);
   }
 
-  if (!date) {
-    console.error("Please provide a date in format YYYY-MM-DD");
+  generateCharacter(username, date).catch((error) => {
+    console.error(error);
     process.exit(1);
-  }
-
-  console.log(`Processing tweets for ${username} from ${date}`);
-  const processor = new TweetProcessor(username, date);
-  await processor.processTweets();
-};
-
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+  });
+}
